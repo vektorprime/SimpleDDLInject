@@ -67,6 +67,12 @@ int main()
 	//cleanup
 	//wait for the thread to return
 	WaitForSingleObject(remoteThread, INFINITE);
+	DWORD threadExitCode = 0;
+	GetExitCodeThread(remoteThread, &threadExitCode);
+	if (threadExitCode == NULL)
+	{
+		std::cout << "The remote thread was created but returned an error. Error : " << threadExitCode << std::endl;
+	}
 	//free memory in remote proc
 	VirtualFreeEx(processHandle, remoteBuffer, sizeof(dllPath), MEM_RELEASE);
 	//close handle in remote proc
