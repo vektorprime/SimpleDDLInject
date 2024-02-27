@@ -36,6 +36,8 @@ int main()
 	if (remoteBuffer == NULL)
 	{
 		std::cout << "Failed to allocate memory in remote process buffer" << std::endl;
+		//close handle in remote proc
+		CloseHandle(processHandle);
 		return 1;
 	}
 
@@ -44,6 +46,10 @@ int main()
 	if (remoteWrite == false)
 	{
 		std::cout << "Failed to write the dllPath in the remote process buffer" << std::endl;
+		//free memory in remote proc
+		VirtualFreeEx(processHandle, remoteBuffer, sizeof(dllPath), MEM_RELEASE);
+		//close handle in remote proc
+		CloseHandle(processHandle);
 		return 1;
 	}
 
@@ -60,6 +66,10 @@ int main()
 	if (remoteThread == NULL)
 	{
 		std::cout << "Failed to create a thread in the remote process" << std::endl;
+		//free memory in remote proc
+		VirtualFreeEx(processHandle, remoteBuffer, sizeof(dllPath), MEM_RELEASE);
+		//close handle in remote proc
+		CloseHandle(processHandle);
 		return 1;
 	}
 	
