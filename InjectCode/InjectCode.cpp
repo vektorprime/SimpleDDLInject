@@ -6,7 +6,7 @@
 int main()
 {
 
-	std::array<wchar_t, 45> dllPath[] = { L"C:\\Users\\Vic\\source\\repos\\InjectCode\\bad.dll" };
+	std::array<wchar_t, 45> dllPath[] = { L"bad.dll" };
 
 
 	std::string pid_q{};
@@ -16,17 +16,18 @@ int main()
 	DWORD pid = std::stoi(pid_q);
 
 	HANDLE processHandle = OpenProcess(
-		PROCESS_QUERY_INFORMATION |		 // For Alloc
-		PROCESS_CREATE_THREAD |			 // For CreateRemoteThread
-		PROCESS_VM_OPERATION |			 // For VirtualAllocEx
-		PROCESS_VM_WRITE,				 // For WriteProcessMemory
-		FALSE, 
+		PROCESS_QUERY_INFORMATION |                 // For Alloc
+		PROCESS_CREATE_THREAD |                     // For CreateRemoteThread
+		PROCESS_VM_OPERATION |                      // For VirtualAllocEx
+		PROCESS_VM_WRITE,                           // For WriteProcessMemory
+		FALSE,
 		pid
 	);
 
 	if (processHandle == NULL)
 	{
 		std::cout << "Failed to get handle for remote process" << std::endl;
+		std::cin.get();
 		return 1;
 	}
 
@@ -38,6 +39,7 @@ int main()
 		std::cout << "Failed to allocate memory in remote process buffer" << std::endl;
 		//close handle in remote proc
 		CloseHandle(processHandle);
+		std::cin.get();
 		return 1;
 	}
 
@@ -50,17 +52,25 @@ int main()
 		VirtualFreeEx(processHandle, remoteBuffer, sizeof(dllPath), MEM_RELEASE);
 		//close handle in remote proc
 		CloseHandle(processHandle);
+		std::cin.get();
 		return 1;
 	}
 
-	//Prepare the address of the LoadLibraryW function from Kernel32 in the target proc
-	//The address will be used as the function to execute in the remote thread
-	PTHREAD_START_ROUTINE functionToExecuteAddress = (PTHREAD_START_ROUTINE)GetProcAddress(
-		GetModuleHandle(L"Kernel32"), 
-		"LoadLibraryW"
-	);
+	//Get a handle to the kernel32.dll module in this process's memory space.
+	HMODULE Kernel32ModuleHandle = GetModuleHandle(L"Kernel32");
 
-	//Create a remote thread in the target proc and tell it to execute the function with argument remote buffer (dllpath)
+	//Search the module for a function called LoadLibraryW via the handle,
+	//and return the address relative to the base address of the module within this process's memory space.
+	//Store this address in an object of type PTHREAD_START_ROUTINE so we can use it later.
+	PTHREAD_START_ROUTINE functionToExecuteAddress = reinterpret_cast<PTHREAD_START_ROUTINE>(
+		GetProcAddress(
+			Kernel32ModuleHandle,
+			"LoadLibraryW"
+		));
+
+	//Create a remote thread in the process that we have a handle to.
+	//Pass the offset from the module's base address for the function we want to execute in the remote process (LoadLibraryW).
+	//Pass the DLL name via the remoteBuffer we filled in previously in the target process's memory space.
 	HANDLE remoteThread = CreateRemoteThread(processHandle, NULL, 0, functionToExecuteAddress, remoteBuffer, 0, NULL);
 
 	if (remoteThread == NULL)
@@ -70,9 +80,10 @@ int main()
 		VirtualFreeEx(processHandle, remoteBuffer, sizeof(dllPath), MEM_RELEASE);
 		//close handle in remote proc
 		CloseHandle(processHandle);
+		std::cin.get();
 		return 1;
 	}
-	
+
 
 	//cleanup
 	//wait for the thread to return
@@ -87,7 +98,7 @@ int main()
 	VirtualFreeEx(processHandle, remoteBuffer, sizeof(dllPath), MEM_RELEASE);
 	//close handle in remote proc
 	CloseHandle(processHandle);
-
+	std::cin.get();
 	return 0;
 }
 
